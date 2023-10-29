@@ -1,7 +1,7 @@
 library(ggplot2)
 library(ggpubr)
 library(dplyr)
-
+library(countreg)
 
 show_dists <- function(df) {
   plots <- list()
@@ -46,7 +46,7 @@ impute_column <- function(df, column_name, new_value, bad_test = is.na, bad_indi
     impute_indicator_name <- paste("impute", column_name, sep = "_")
     df[impute_indicator_name] <- as.integer(bad_test(df[,column_name]))
   }
-
+  
   # impute NA values
   df[column_name][bad_test(df[column_name])] <- new_value
   return (df)
@@ -136,8 +136,8 @@ calc_cross_validate_AUC <- function(df, column_name, target_name, pred_func) {
   for (rep in 1:length(aucs)) {
     useForCalRep <- rbinom(n=nrow(df), size=1, prob=0.1) > 0
     predRep <- pred_func(df[!useForCalRep, target_name],
-                       df[!useForCalRep, column_name],
-                       df[useForCalRep, column_name])
+                         df[!useForCalRep, column_name],
+                         df[useForCalRep, column_name])
     aucs[rep] <- calcAUC(predRep, df[useForCalRep, target_name])
   }
   (aucs)
@@ -152,12 +152,12 @@ split.fun <- function(x, labs, digits, varlen, faclen)
   labs
 }
 
-assess_model <- function(true_values, pred_values) {
+assess_classifer <- function(true_values, pred_values) {
   rocobj <- roc(as.factor(true_values), pred_values)
   best_threshold <- coords(rocobj, "best")$threshold
   
   cm <- confusionMatrix(data= as.factor(as.numeric(pred_values > best_threshold)), 
-                             reference = as.factor(true_values))
+                        reference = as.factor(true_values))
   
   tp <- cm$table[2, 2]
   tn <- cm$table[1, 1]
@@ -178,4 +178,28 @@ print_clusters <- function(df, groups, cols_to_print) {
     print(paste("cluster", i))
     print(df[groups == i, cols_to_print])
   }
+}
+
+residual_plot <- function(model, title) {
+  res <- residuals(model, type = "pearson")
+  fit <-  fitted.values(model)
+  data <- data.frame(
+    res = res, 
+    fit = fit
+  )
+  plt <- ggplot(data, aes(x = fit, y = res)) + geom_point() +ggtitle(title) + 
+    theme(plot.title = element_text(size = 10)) + labs(x = "Fitted values", y = "Pearson Residuals")
+  plt
+  
+  # plot(residuals(m1.poisson.simple, type = "pearson") ~ fitted.values(m1.poisson.simple),
+  #      xlab = "Fitted values", ylab = "Pearson Residuals",
+  #      main = "Poisson Model")
+}
+
+
+rooto_plot <- function(model, title) {
+  plt <- autoplot(countreg::rootogram(model, plot = FALSE, style = "hanging"), 
+                  colour = c("black", "darkblue"), 
+                  size = c(1.2, 2)) + ggtitle(title)
+  plt
 }
